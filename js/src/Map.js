@@ -302,6 +302,11 @@ var LeafletMapView = utils.LeafletDOMWidgetView.extend({
         LeafletMapView.__super__.processPhosphorMessage.apply(this, arguments);
         switch (msg.type) {
             case 'resize':
+                var container = this.map_container;
+                if (container.clientHeight !== container.parentElement.clientHeight) {
+                    container.style.height = container.parentElement.clientHeight + 'px';
+                }
+
                 // We set the dirty flag to true to prevent the sub-pixel error
                 // on the new center to be reflected on the model.
                 this.dirty = true
