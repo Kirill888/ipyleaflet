@@ -33,68 +33,97 @@ var LeafletDrawControlView = LeafletControlView.extend({
 
     create_obj: function () {
         var that = this;
+
         this.feature_group = L.featureGroup();
         this.map_view.obj.addLayer(this.feature_group);
+
         var polyline = this.model.get('polyline');
-        if (_.isEmpty(polyline)) { polyline = false; }
         var polygon = this.model.get('polygon');
-        if (_.isEmpty(polygon)) { polygon = false; }
         var circle = this.model.get('circle');
-        if (_.isEmpty(circle)) { circle = false; }
-        var circlemarker = this.model.get('circlemarker');
-        if (_.isEmpty(circlemarker)) { circlemarker = false; }
         var rectangle = this.model.get('rectangle');
-        if (_.isEmpty(rectangle)) { rectangle = false; }
         var marker = this.model.get('marker');
-        if (_.isEmpty(marker)) { marker = false; }
-        this.obj = new L.Control.Draw({
-            edit: {
-                featureGroup: this.feature_group,
-                edit: this.model.get('edit'),
-                remove: this.model.get('remove')
-            },
-            draw: {
-                polyline: polyline,
-                polygon: polygon,
-                circle: circle,
-                circlemarker: circlemarker,
-                rectangle: rectangle,
-                marker: marker
-            }
+        var circlemarker = this.model.get('circlemarker');
+        let map = this.map_view.obj;
+
+        //TODO: figure out how to create pm controller without adding it to the
+        //map, for now add mock object so that calling code doesn't break
+        this.obj = {addTo: ()=>{}};
+        const edit = this.model.get('edit');
+        const remove = this.model.get('remove');
+        //TODO: For now cut + drag are same as edit
+        //TODO: deal with shapeOptions
+
+        map.pm.addControls({
+            drawPolyline:  !_.isEmpty(polyline),
+            drawPolygon:   !_.isEmpty(polygon),
+            drawRectangle: !_.isEmpty(rectangle),
+            drawCircle:    !_.isEmpty(circle),
+            drawMarker:    !_.isEmpty(marker),
+            editMode: edit,
+            dragMode: edit,
+            cutPolygon: edit,
+            removalMode: remove,
         });
-        this.map_view.obj.on('draw:created', function (e) {
-            var type = e.layerType;
-            var layer = e.layer;
-            var geo_json = layer.toGeoJSON();
+
+        let extract_geojson = (layer) => {
+            if (layer === undefined) {
+                return undefined;
+            }
+
+            let geo_json = layer.toGeoJSON();
             geo_json.properties.style = layer.options;
+            return geo_json;
+        };
+
+        let pm_on_edit = (e) => {
+            that.send({
+                'event': 'draw:edited',
+                'geo_json': extract_geojson(e.target)
+            });
+       };
+
+        let pm_on_remove = (e) => {
+            that.feature_group.removeLayer(e.layer);
+
+            that.send({
+                'event': 'draw:deleted',
+                'geo_json': extract_geojson(e.layer)
+            });
+        };
+
+        let pm_on_cut = (e) => {
+
+            let layer = e.layer.getLayers()[0]; //TODO: not sure why this is needed?
+            layer.on('pm:edit', pm_on_edit);
+
+            that.feature_group.removeLayer(e.originalLayer);
+            that.feature_group.addLayer(layer);
+
+            //TODO: events, should it be custom event instead of deleted+created?
+            that.send({
+                'event': 'draw:deleted',
+                'geo_json': extract_geojson(e.originalLayer)
+            });
+
             that.send({
                 'event': 'draw:created',
-                'geo_json': geo_json
+                'geo_json': extract_geojson(layer)
             });
-            that.feature_group.addLayer(layer);
-        });
-        this.map_view.obj.on('draw:edited', function (e) {
-            var layers = e.layers;
-            layers.eachLayer(function (layer) {
-                var geo_json = layer.toGeoJSON();
-                geo_json.properties.style = layer.options;
-                that.send({
-                    'event': 'draw:edited',
-                    'geo_json': geo_json
-                });
+        };
+
+        let pm_on_create = (e) => {
+            e.layer.on('pm:edit', pm_on_edit, that);
+            that.feature_group.addLayer(e.layer);
+
+            that.send({
+                'event': 'draw:created',
+                'geo_json': extract_geojson(e.layer)
             });
-        });
-        this.map_view.obj.on('draw:deleted', function (e) {
-            var layers = e.layers;
-            layers.eachLayer(function (layer) {
-                var geo_json = layer.toGeoJSON();
-                geo_json.properties.style = layer.options;
-                that.send({
-                    'event': 'draw:deleted',
-                    'geo_json': geo_json
-                });
-            });
-        });
+        };
+
+        this.map_view.obj.on('pm:cut', pm_on_cut);
+        this.map_view.obj.on('pm:create', pm_on_create);
+        this.map_view.obj.on('pm:remove', pm_on_remove);
         this.model.on('msg:custom', _.bind(this.handle_message, this));
     },
 

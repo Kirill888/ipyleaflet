@@ -1,6 +1,6 @@
 var L = require('leaflet');
 require('leaflet-splitmap');
-require('leaflet-draw');
+require('leaflet.pm');
 require('leaflet.markercluster');
 require('leaflet-velocity');
 require('leaflet-measure');

@@ -1,6 +1,6 @@
 // Load css
 require('leaflet/dist/leaflet.css');
-require('leaflet-draw/dist/leaflet.draw.css');
+require('leaflet.pm/dist/leaflet.pm.css');
 require('leaflet.markercluster/dist/MarkerCluster.css');
 require('leaflet.markercluster/dist/MarkerCluster.Default.css');
 require('leaflet-measure/dist/leaflet-measure.css');
